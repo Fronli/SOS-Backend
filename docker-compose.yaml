@@ -1,13 +1,57 @@
 services:
+  # ─── PostgreSQL ───────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fronli}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fronli}
+      POSTGRES_DB: ${POSTGRES_DB:-mobile_api}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fronli} -d ${POSTGRES_DB:-mobile_api}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ─── Drizzle Migration (otomatis jalan saat: docker compose up -d --build) ──────
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrations
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fronli}:${POSTGRES_PASSWORD:-fronli}@postgres:5432/${POSTGRES_DB:-mobile_api}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    init: true
+
+  # ─── API ──────────────────────────────────────────────────────────────────────
   api:
     build:
       context: .
       dockerfile: Dockerfile
+      target: production
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fronli}:${POSTGRES_PASSWORD:-fronli}@postgres:5432/${POSTGRES_DB:-mobile_api}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
     init: true
     healthcheck:
@@ -19,4 +63,7 @@ services:
       interval: 30s
       timeout: 3s
       retries: 3
-      start_period: 5s
+      start_period: 15s
+
+volumes:
+  postgres_data:

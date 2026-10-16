@@ -1,6 +1,8 @@
 *.env
+user.json
 node_modules/
-
+README.md
+.vscode/
 
 # Logs & Debugging
 logs/
@@ -16,3 +18,5 @@ Thumbs.db
 .vscode/*
 !.vscode/settings.json
 .idea/
+dist/
+/tests/*.js
