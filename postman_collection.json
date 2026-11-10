@@ -1,0 +1,219 @@
+{
+  "info": {
+    "name": "SOS - Student on Study API",
+    "description": "Koleksi API untuk manual testing core endpoint SOS",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "PASTE_YOUR_JWT_TOKEN_HERE",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Fronli Dev\",\n  \"email\": \"fronli@example.com\",\n  \"password\": \"rahasia123\",\n  \"university\": \"Universitas Indonesia\",\n  \"major\": \"Teknik Informatika\",\n  \"linkedin_url\": \"https://linkedin.com/in/fronli\",\n  \"website\": \"https://fronli.dev\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"fronli@example.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["auth", "verify-otp"] }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"fronli@example.com\",\n  \"password\": \"rahasia123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get Profile (Me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"] }
+          }
+        },
+        {
+          "name": "Update Profile (Me)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Fronli Dev Updated\",\n  \"university\": \"Universitas Gadjah Mada\",\n  \"major\": \"Sistem Informasi\",\n  \"linkedin_url\": \"https://linkedin.com/in/fronlidev\",\n  \"website\": \"https://fronli.dev\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/users/me", "host": ["{{baseUrl}}"], "path": ["users", "me"] }
+          }
+        },
+        {
+          "name": "Get My Requests",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/requests?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "me", "requests"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tags",
+      "item": [
+        {
+          "name": "Get All Tags",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/tags", "host": ["{{baseUrl}}"], "path": ["tags"] }
+          }
+        },
+        {
+          "name": "Search Tags (by query 'design')",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/tags?q=design",
+              "host": ["{{baseUrl}}"],
+              "path": ["tags"],
+              "query": [{ "key": "q", "value": "design" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Requests",
+      "item": [
+        {
+          "name": "Create Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bantu Desain Wireframe Mobile App SOS\",\n  \"description\": \"Dibutuhkan bantuan untuk membuat wireframe low-fidelity dan high-fidelity aplikasi SOS menggunakan Figma.\",\n  \"estimated_time\": \"moderate\",\n  \"deadline_at\": \"2026-12-31T23:59:59.000Z\",\n  \"budget_amount\": 150000,\n  \"tag_ids\": [1, 2]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/requests", "host": ["{{baseUrl}}"], "path": ["requests"] }
+          }
+        },
+        {
+          "name": "List All Requests",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/requests?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Requests with Filters",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/requests?q=wireframe&tag_id=1&estimated_time=moderate&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["requests"],
+              "query": [
+                { "key": "q", "value": "wireframe" },
+                { "key": "tag_id", "value": "1" },
+                { "key": "estimated_time", "value": "moderate" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Request Detail",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/requests/1", "host": ["{{baseUrl}}"], "path": ["requests", "1"] }
+          }
+        },
+        {
+          "name": "Update Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Bantu Desain Wireframe & Interactive Prototype Figma SOS\",\n  \"description\": \"Deskripsi baru yang diperbarui untuk tugas prototyping.\",\n  \"estimated_time\": \"extended\",\n  \"deadline_at\": \"2027-01-15T23:59:59.000Z\",\n  \"budget_amount\": 250000,\n  \"tag_ids\": [1, 2, 6]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/requests/1", "host": ["{{baseUrl}}"], "path": ["requests", "1"] }
+          }
+        },
+        {
+          "name": "Delete Request (Soft Delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/requests/1", "host": ["{{baseUrl}}"], "path": ["requests", "1"] }
+          }
+        }
+      ]
+    }
+  ]
+}
+

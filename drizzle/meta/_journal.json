@@ -8,6 +8,13 @@
       "when": 1792057158213,
       "tag": "0000_normal_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794131298203,
+      "tag": "0001_brave_sphinx",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,9 @@
 # 📚 API Documentation — SOS (Student On Study)
 
-**Base URL:** `http://localhost:5000/api/v1`  
-**Format:** Semua request dan response menggunakan `Content-Type: application/json`
+**Base URL (port bawaan):** `http://localhost:3000/api/v1`
+**Format:** Request dengan body dan response API menggunakan JSON (`Content-Type: application/json`). Endpoint `DELETE` yang berhasil mengembalikan `204` tanpa body.
+
+Port dapat diubah melalui variabel lingkungan `PORT`. Gunakan header `Authorization: Bearer <token>` untuk endpoint yang membutuhkan autentikasi. Token diperoleh dari `/auth/login` dan berlaku 1 hari.
 
 ---
 
@@ -14,6 +16,17 @@
 | `POST` | `/api/v1/auth/resend-otp` | Kirim ulang OTP | ❌ |
 | `POST` | `/api/v1/auth/login` | Login & dapatkan token | ❌ |
 | `GET` | `/health` | Health check server | ❌ |
+| `GET` | `/api/v1/users/me` | Ambil profil user login | 🔑 Bearer (Unverified OK) |
+| `PATCH` | `/api/v1/users/me` | Update profil user | 🔑 Bearer + Verified |
+| `GET` | `/api/v1/users/me/requests` | Daftar request milik sendiri | 🔑 Bearer + Verified |
+| `GET` | `/api/v1/tags` | Katalog bidang pekerjaan / tags | 🔑 Bearer + Verified |
+| `POST` | `/api/v1/requests` | Buat request pekerjaan | 🔑 Bearer + Verified |
+| `GET` | `/api/v1/requests` | Daftar request pekerjaan yang belum dihapus | 🔑 Bearer + Verified |
+| `GET` | `/api/v1/requests/:id` | Detail request pekerjaan | 🔑 Bearer + Verified |
+| `PATCH` | `/api/v1/requests/:id` | Update request milik sendiri | 🔑 Bearer + Verified |
+| `DELETE` | `/api/v1/requests/:id` | Hapus secara lunak request sendiri | 🔑 Bearer + Verified |
+
+**Status fitur:** Penugasan helper sudah memiliki tabel database, tetapi endpoint untuk mendaftar atau menugaskan helper belum tersedia. `budget_amount` adalah nominal penawaran dalam rupiah, belum merupakan transaksi pembayaran.
 
 ---
 
@@ -69,12 +82,12 @@ Mendaftarkan akun baru. Setelah berhasil, sistem otomatis mengirimkan kode **OTP
     "created_at": "2026-10-16T04:00:00.000Z",
     "updated_at": "2026-10-16T04:00:00.000Z",
     "requires_verification": true,
-    "otp_expires_in": 300
+    "otp_expires_in": 600
   }
 }
 ```
 
-> `otp_expires_in` adalah waktu kedaluwarsa OTP dalam **detik** (contoh: `300` = 5 menit).
+> `otp_expires_in` adalah waktu kedaluwarsa OTP dalam **detik** (`600` = 10 menit). OTP maksimal dicoba 5 kali; pengiriman ulang memiliki jeda 60 detik.
 
 #### Response Error
 
@@ -146,7 +159,7 @@ Memverifikasi kode OTP 6 digit yang diterima lewat email. Jika berhasil, akun la
 > ⚠️ **Penting soal percobaan gagal:**
 > - Setiap OTP yang salah akan menambah `attempts` counter.
 > - Jika `attempts >= REGISTER_OTP_MAX_ATTEMPTS`, endpoint ini **selalu** mengembalikan `429` hingga OTP baru dikirim via `/resend-otp`.
-> - Pengecekan OTP dilakukan **setelah** bcrypt hash compare, bukan sebelumnya — ini mencegah timing attack.
+> - Kode OTP dibandingkan dengan hash bcrypt. Server memeriksa batas percobaan dan masa berlaku sebelum perbandingan, lalu memeriksa masa berlaku sekali lagi setelahnya.
 
 ---
 
@@ -177,7 +190,7 @@ Terdapat **cooldown** (jeda wajib) antar pengiriman OTP — jika terlalu cepat m
   "success": true,
   "message": "OTP baru telah dikirim ke email Anda.",
   "data": {
-    "otp_expires_in": 300
+    "otp_expires_in": 600
   }
 }
 ```
@@ -346,3 +359,305 @@ Response `429` pada `/resend-otp` memiliki tambahan field:
   "retry_after_seconds": 47
 }
 ```
+
+Endpoint terproteksi juga dapat mengembalikan `401` jika token tidak ada, tidak valid, atau akun tidak ditemukan; `403` jika email belum diverifikasi. Kesalahan validasi body dan ID umumnya menghasilkan `400`, request yang tidak ditemukan atau telah dihapus menghasilkan `404`, dan kegagalan server menghasilkan `500`.
+
+
+---
+
+## 👤 User Endpoints
+
+---
+
+### 1. Ambil Profil Sendiri (Get My Profile)
+
+**`GET /api/v1/users/me`**
+- **Auth:** `Bearer <token>` (Pengguna belum terverifikasi tetap dapat mengakses)
+
+Middleware endpoint ini tidak memeriksa status verifikasi. Namun, proses login saat ini hanya menerbitkan token untuk email yang sudah terverifikasi.
+
+#### Response Sukses — `200 OK`
+```json
+{
+  "success": true,
+  "message": "Profil berhasil diambil",
+  "data": {
+    "id": 1,
+    "full_name": "John Doe",
+    "email": "john@example.com",
+    "university": "Universitas Indonesia",
+    "major": "Teknik Informatika",
+    "linkedin_url": "https://linkedin.com/in/johndoe",
+    "website": "https://johndoe.dev",
+    "email_verified_at": "2026-10-16T04:05:00.000Z",
+    "created_at": "2026-10-16T04:00:00.000Z",
+    "updated_at": "2026-10-16T04:05:00.000Z"
+  }
+}
+```
+
+---
+
+### 2. Update Profil Sendiri (Update Profile)
+
+**`PATCH /api/v1/users/me`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi)
+
+#### Request Body
+```json
+{
+  "full_name": "John Doe Updated",
+  "university": "Universitas Gadjah Mada",
+  "major": "Sistem Informasi",
+  "linkedin_url": "https://linkedin.com/in/johndoe2",
+  "website": null
+}
+```
+Minimal kirim satu field. `full_name` harus 2–255 karakter setelah trim; `university` dan `major` harus 1–255 karakter setelah trim. `linkedin_url` dan `website` menerima URL HTTP/HTTPS maksimal 255 karakter, string kosong, atau `null` (dua nilai terakhir disimpan sebagai `null`). Field lain, termasuk `id`, `email`, `password`, dan timestamp, ditolak dengan `400`.
+
+#### Response Sukses — `200 OK`
+```json
+{
+  "success": true,
+  "message": "Profil berhasil diperbarui",
+  "data": {
+    "id": 1,
+    "full_name": "John Doe Updated",
+    "email": "john@example.com",
+    "university": "Universitas Gadjah Mada",
+    "major": "Sistem Informasi",
+    "linkedin_url": "https://linkedin.com/in/johndoe2",
+    "website": null,
+    "email_verified_at": "2026-10-16T04:05:00.000Z",
+    "created_at": "2026-10-16T04:00:00.000Z",
+    "updated_at": "2026-10-16T05:00:00.000Z"
+  }
+}
+```
+
+---
+
+## 🏷️ Tags Endpoints
+
+---
+
+### 1. Ambil Katalog Tag
+
+**`GET /api/v1/tags`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi)
+- **Query Params (Opsional):**
+  - `q`: Kata kunci pencarian nama tag, tanpa membedakan huruf besar/kecil (contoh: `/api/v1/tags?q=design`). Hasil diurutkan menurut nama.
+
+#### Response Sukses — `200 OK`
+```json
+{
+  "success": true,
+  "message": "Daftar tag berhasil diambil",
+  "data": [
+    { "id": 1, "name": "Design", "slug": "design" },
+    { "id": 6, "name": "Digital Product", "slug": "digital-product" },
+    { "id": 3, "name": "Development", "slug": "development" },
+    { "id": 5, "name": "Startup", "slug": "startup" },
+    { "id": 4, "name": "Technology", "slug": "technology" },
+    { "id": 2, "name": "UI/UX", "slug": "ui-ux" }
+  ]
+}
+```
+
+---
+
+## 📋 Requests Endpoints
+
+---
+
+### 1. Buat Request Baru
+
+**`POST /api/v1/requests`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi)
+
+#### Request Body
+```json
+{
+  "title": "Bantu Desain Wireframe Mobile App SOS",
+  "description": "Dibutuhkan bantuan untuk membuat wireframe low-fidelity dan high-fidelity aplikasi SOS menggunakan Figma.",
+  "estimated_time": "moderate",
+  "deadline_at": "2026-12-31T23:59:59.000Z",
+  "budget_amount": 150000,
+  "tag_ids": [1, 2]
+}
+```
+
+| Field | Tipe | Wajib | Keterangan |
+|-------|------|--------|------------|
+| `title` | `string` | ✅ | 5–150 karakter (setelah trim) |
+| `description` | `string` | ✅ | 10–10.000 karakter (setelah trim) |
+| `estimated_time` | `string` | ✅ | `'fast'`, `'moderate'`, atau `'extended'` |
+| `deadline_at` | `string` | ✅ | Tanggal yang dapat diparse JavaScript dan harus di masa depan; gunakan ISO 8601 dengan timezone agar tidak ambigu |
+| `budget_amount` | `integer` | ✅ | Rp 0 – 2.147.483.647 |
+| `tag_ids` | `number[]` | ✅ | 1–5 ID tag valid, tidak boleh duplikat |
+
+`title` dan `description` disimpan setelah trim. `budget_amount` adalah nominal rupiah bulat; `0` berarti bantuan gratis. `requester_id` diambil dari token. Field seperti `requester_id`, `helper_id`, `status`, `response`, `max_helpers`, `id`, dan timestamp tidak boleh dikirim.
+
+#### Response Sukses — `201 Created`
+```json
+{
+  "success": true,
+  "message": "Request pekerjaan berhasil dibuat",
+  "data": {
+    "id": 1,
+    "title": "Bantu Desain Wireframe Mobile App SOS",
+    "description": "Dibutuhkan bantuan untuk membuat wireframe low-fidelity dan high-fidelity aplikasi SOS menggunakan Figma.",
+    "estimated_time": "moderate",
+    "deadline_at": "2026-12-31T23:59:59.000Z",
+    "budget_amount": 150000,
+    "created_at": "2026-11-08T14:00:00.000Z",
+    "updated_at": "2026-11-08T14:00:00.000Z",
+    "is_expired": false,
+    "requester": {
+      "id": 1,
+      "full_name": "John Doe",
+      "university": "Universitas Indonesia",
+      "major": "Teknik Informatika"
+    },
+    "tags": [
+      { "id": 1, "name": "Design", "slug": "design" },
+      { "id": 2, "name": "UI/UX", "slug": "ui-ux" }
+    ]
+  }
+}
+```
+
+---
+
+### 2. Daftar Semua Request
+
+**`GET /api/v1/requests`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi)
+- **Query Params (Opsional):**
+  - `q`: Cari judul atau deskripsi (case-insensitive)
+  - `tag_id`: Filter berdasarkan ID tag
+  - `estimated_time`: `fast`, `moderate`, atau `extended`
+  - `page`: Nomor halaman (default: `1`)
+  - `limit`: Jumlah per halaman (default: `20`, max: `50`)
+
+`page` atau `limit` yang bukan bilangan positif akan memakai nilai bawaan; `limit` di atas `50` dibatasi menjadi `50`. Filter `tag_id` dan `estimated_time` yang tidak valid diabaikan. Hasil diurutkan dari `created_at` terbaru, kemudian `id` terbesar. Request yang dihapus secara lunak tidak ditampilkan; request dengan tenggat lewat tetap ditampilkan dengan `is_expired: true`. `meta.total_pages` bernilai minimal `1`, termasuk saat hasil kosong.
+
+Contoh: `GET /api/v1/requests?q=desain&tag_id=1&page=1&limit=10`
+
+#### Response Sukses — `200 OK`
+```json
+{
+  "success": true,
+  "message": "Daftar request berhasil diambil",
+  "data": [
+    {
+      "id": 1,
+      "title": "Bantu Desain Wireframe Mobile App SOS",
+      "description": "Dibutuhkan bantuan untuk membuat wireframe low-fidelity dan high-fidelity aplikasi SOS menggunakan Figma.",
+      "estimated_time": "moderate",
+      "deadline_at": "2026-12-31T23:59:59.000Z",
+      "budget_amount": 150000,
+      "created_at": "2026-11-08T14:00:00.000Z",
+      "updated_at": "2026-11-08T14:00:00.000Z",
+      "is_expired": false,
+      "requester": {
+        "id": 1,
+        "full_name": "John Doe",
+        "university": "Universitas Indonesia",
+        "major": "Teknik Informatika"
+      },
+      "tags": [
+        { "id": 1, "name": "Design", "slug": "design" }
+      ]
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 10,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+---
+
+### 3. Detail Request
+
+**`GET /api/v1/requests/:id`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi)
+
+#### Response Sukses — `200 OK`
+```json
+{
+  "success": true,
+  "message": "Detail request berhasil diambil",
+  "data": {
+    "id": 1,
+    "title": "Bantu Desain Wireframe Mobile App SOS",
+    "description": "Dibutuhkan bantuan untuk membuat wireframe low-fidelity dan high-fidelity aplikasi SOS menggunakan Figma.",
+    "estimated_time": "moderate",
+    "deadline_at": "2026-12-31T23:59:59.000Z",
+    "budget_amount": 150000,
+    "created_at": "2026-11-08T14:00:00.000Z",
+    "updated_at": "2026-11-08T14:00:00.000Z",
+    "is_expired": false,
+    "requester": {
+      "id": 1,
+      "full_name": "John Doe",
+      "university": "Universitas Indonesia",
+      "major": "Teknik Informatika"
+    },
+    "tags": [
+      { "id": 1, "name": "Design", "slug": "design" },
+      { "id": 2, "name": "UI/UX", "slug": "ui-ux" }
+    ]
+  }
+}
+```
+
+---
+
+### 4. Daftar Request Milik Sendiri
+
+**`GET /api/v1/users/me/requests`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi)
+- Mendukung query parameter dan bentuk `data`/`meta` yang sama dengan `GET /api/v1/requests`, tetapi hanya menampilkan request milik pengguna. Pesan sukses: `Daftar request Anda berhasil diambil`.
+
+---
+
+### 5. Update Request Sendiri
+
+**`PATCH /api/v1/requests/:id`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi & pembuat request)
+- Jika request sudah memiliki helper ditugaskan, server mengembalikan `409 Conflict`.
+- Body boleh berisi satu atau beberapa field dari tabel pada bagian "Buat Request Baru"; semua validasi field tersebut tetap berlaku. Jika `tag_ids` dikirim, seluruh tag lama diganti. Body kosong atau field di luar daftar menghasilkan `400`.
+
+#### Request Body
+```json
+{
+  "title": "Bantu Desain Wireframe & Prototype Figma SOS",
+  "description": "Deskripsi baru minimal 10 karakter...",
+  "estimated_time": "extended",
+  "deadline_at": "2027-01-15T23:59:59.000Z",
+  "budget_amount": 250000,
+  "tag_ids": [1, 2, 6]
+}
+```
+
+#### Response Sukses — `200 OK`
+Response berisi `success: true`, `message: "Request berhasil diperbarui"`, dan objek `data` dengan bentuk yang sama seperti response `GET /api/v1/requests/:id`.
+
+Jika ID tidak valid server mengembalikan `400`; request tidak ada atau telah dihapus `404`; pengguna bukan pemilik `403`; dan request sudah memiliki helper `409`.
+
+---
+
+### 6. Hapus Request Sendiri (Soft Delete)
+
+**`DELETE /api/v1/requests/:id`**
+- **Auth:** `Bearer <token>` (Wajib email terverifikasi & pembuat request)
+- Jika request sudah memiliki helper ditugaskan, server mengembalikan `409 Conflict`.
+- Penghapusan bersifat lunak: request tidak lagi muncul pada daftar atau detail, dan tidak dapat diubah lagi. ID tidak valid menghasilkan `400`, request tidak ada/sudah dihapus `404`, dan pengguna bukan pemilik `403`.
+
+#### Response Sukses — `204 No Content`
+(Tanpa body)

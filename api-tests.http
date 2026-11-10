@@ -1,0 +1,108 @@
+### Environment Variables
+@baseUrl = http://localhost:5000/api/v1
+# Ganti dengan token yang didapat dari POST /auth/login
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###############################################################################
+# 1. USER PROFILE ENDPOINTS
+###############################################################################
+
+### 1.1 Ambil Profil Sendiri (GET /users/me)
+# Catatan: Tidak wajib email_verified_at
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+
+### 1.2 Update Profil Sendiri (PATCH /users/me)
+# Catatan: Wajib JWT + email sudah terverifikasi
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "full_name": "Fronli Dev",
+  "university": "Universitas Indonesia",
+  "major": "Teknik Informatika",
+  "linkedin_url": "https://linkedin.com/in/fronlidev",
+  "website": "https://fronli.dev"
+}
+
+### 1.3 Update Profil Sendiri - Sebagian Field / Set null
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "university": "Institut Teknologi Bandung",
+  "website": null
+}
+
+###############################################################################
+# 2. TAGS ENDPOINTS
+###############################################################################
+
+### 2.1 Ambil Semua Katalog Tag (GET /tags)
+GET {{baseUrl}}/tags
+Authorization: Bearer {{token}}
+
+### 2.2 Cari Tag dengan Query `q` (GET /tags?q=design)
+GET {{baseUrl}}/tags?q=design
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 3. REQUEST PEKERJAAN (CRUD)
+###############################################################################
+
+### 3.1 Buat Request Pekerjaan Baru (POST /requests)
+# Tag ID: 1 = Design, 2 = UI/UX, 3 = Development, 4 = Technology, 5 = Startup, 6 = Digital Product
+POST {{baseUrl}}/requests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Bantu Desain Wireframe Mobile App SOS",
+  "description": "Dibutuhkan bantuan untuk membuat wireframe low-fidelity dan high-fidelity aplikasi SOS menggunakan Figma.",
+  "estimated_time": "moderate",
+  "deadline_at": "2026-12-31T23:59:59.000Z",
+  "budget_amount": 150000,
+  "tag_ids": [1, 2]
+}
+
+### 3.2 List Semua Request Publik (GET /requests)
+# Default pagination: page=1, limit=20
+GET {{baseUrl}}/requests
+Authorization: Bearer {{token}}
+
+### 3.3 List Request dengan Filter Lengkap
+GET {{baseUrl}}/requests?q=wireframe&tag_id=1&estimated_time=moderate&page=1&limit=10
+Authorization: Bearer {{token}}
+
+### 3.4 Ambil Detail Request berdasarkan ID (GET /requests/:id)
+GET {{baseUrl}}/requests/1
+Authorization: Bearer {{token}}
+
+### 3.5 List Request Milik Sendiri (GET /users/me/requests)
+GET {{baseUrl}}/users/me/requests
+Authorization: Bearer {{token}}
+
+### 3.6 List Request Milik Sendiri dengan Search/Filter
+GET {{baseUrl}}/users/me/requests?q=desain&page=1&limit=5
+Authorization: Bearer {{token}}
+
+### 3.7 Edit Request Sendiri (PATCH /requests/:id)
+PATCH {{baseUrl}}/requests/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Bantu Desain Wireframe & Prototyping Figma SOS",
+  "description": "Deskripsi diperbarui: mencakup pembuatan interactive prototype di Figma.",
+  "estimated_time": "extended",
+  "deadline_at": "2027-01-15T23:59:59.000Z",
+  "budget_amount": 250000,
+  "tag_ids": [1, 2, 6]
+}
+
+### 3.8 Hapus Request Sendiri - Soft Delete (DELETE /requests/:id)
+DELETE {{baseUrl}}/requests/1
+Authorization: Bearer {{token}}
+

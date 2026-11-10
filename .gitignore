@@ -1,7 +1,6 @@
 *.env
 user.json
 node_modules/
-README.md
 .vscode/
 
 # Logs & Debugging
