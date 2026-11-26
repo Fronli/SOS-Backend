@@ -2,7 +2,11 @@ node_modules
 dist
 .env
 *.env
+!.env.example
 npm-debug.log*
 .git
 logs
 *.log
+uploads
+tests
+scripts

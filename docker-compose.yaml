@@ -8,6 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fronli}
       POSTGRES_DB: ${POSTGRES_DB:-mobile_api}
     ports:
+      # Ubah POSTGRES_PORT bila port 5432 di host sudah dipakai PostgreSQL lokal.
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -18,7 +19,7 @@ services:
       retries: 10
       start_period: 10s
 
-  # ─── Drizzle Migration (otomatis jalan saat: docker compose up -d --build) ──────
+  # ─── Drizzle Migration (jalan otomatis saat: docker compose up -d --build) ─────
   migrate:
     build:
       context: .
@@ -35,6 +36,28 @@ services:
     restart: "no"
     init: true
 
+  # ─── Seed opsional: docker compose --profile tools run --rm seed ──────────────
+  # Membuat katalog subject + akun admin dari ADMIN_EMAIL/ADMIN_PASSWORD.
+  # Idempotent, jadi aman dijalankan berulang.
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fronli}:${POSTGRES_PASSWORD:-fronli}@postgres:5432/${POSTGRES_DB:-mobile_api}
+    command: ["npm", "run", "db:seed:prod"]
+    profiles:
+      - tools
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    init: true
+
   # ─── API ──────────────────────────────────────────────────────────────────────
   api:
     build:
@@ -47,8 +70,14 @@ services:
       NODE_ENV: production
       PORT: ${PORT:-3000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-fronli}:${POSTGRES_PASSWORD:-fronli}@postgres:5432/${POSTGRES_DB:-mobile_api}
+      # URL absolut untuk file dari adapter storage lokal (avatar, KTM, lampiran).
+      # Isi di .env saat deploy, mis. https://api.sos.ac.id. Jika kosong, aplikasi
+      # memakai http://localhost:<PORT>.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -67,3 +96,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads:

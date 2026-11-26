@@ -3,34 +3,167 @@
 **Base URL (port bawaan):** `http://localhost:3000/api/v1`
 **Format:** Request dengan body dan response API menggunakan JSON (`Content-Type: application/json`). Endpoint `DELETE` yang berhasil mengembalikan `204` tanpa body.
 
-Port dapat diubah melalui variabel lingkungan `PORT`. Gunakan header `Authorization: Bearer <token>` untuk endpoint yang membutuhkan autentikasi. Token diperoleh dari `/auth/login` dan berlaku 1 hari.
+Port dapat diubah melalui variabel lingkungan `PORT`. Gunakan header `Authorization: Bearer <accessToken>` untuk endpoint yang membutuhkan autentikasi. Access token diperoleh dari `/auth/login` (default berlaku 1 jam) dan dapat diperbarui dengan refresh token lewat `/auth/refresh`.
+
+**Kode status yang dipakai konsisten:** `400` validasi, `401` token tidak ada/invalid, `403` bukan peserta resource atau akun ditangguhkan, `404` resource tidak ditemukan, `409` konflik status, `402` saldo tidak mencukupi, `429` rate limit, `501` fitur payment gateway belum dikonfigurasi.
 
 ---
 
 ## Daftar Endpoint
 
+### Auth & akun
+
 | Method | Endpoint | Keterangan | Auth |
 |--------|----------|------------|------|
 | `POST` | `/api/v1/auth/register` | Registrasi akun baru | ❌ |
-| `POST` | `/api/v1/auth/verify-otp` | Verifikasi OTP email | ❌ |
-| `POST` | `/api/v1/auth/resend-otp` | Kirim ulang OTP | ❌ |
-| `POST` | `/api/v1/auth/login` | Login & dapatkan token | ❌ |
+| `POST` | `/api/v1/auth/verify-email` | Verifikasi OTP email (alias: `/auth/verify-otp`) | ❌ |
+| `POST` | `/api/v1/auth/resend-otp` | Kirim ulang OTP | ❌ (rate limit) |
+| `POST` | `/api/v1/auth/login` | Login → access + refresh token | ❌ (rate limit) |
+| `POST` | `/api/v1/auth/refresh` | Rotasi refresh token | ❌ |
+| `POST` | `/api/v1/auth/logout` | Cabut refresh token | 🔑 Bearer |
+| `POST` | `/api/v1/auth/forgot-password` | Kirim OTP reset password | ❌ (rate limit) |
+| `POST` | `/api/v1/auth/reset-password` | Set password baru via OTP | ❌ |
 | `GET` | `/health` | Health check server | ❌ |
-| `GET` | `/api/v1/users/me` | Ambil profil user login | 🔑 Bearer (Unverified OK) |
-| `PATCH` | `/api/v1/users/me` | Update profil user | 🔑 Bearer + Verified |
-| `GET` | `/api/v1/users/me/requests` | Daftar request milik sendiri | 🔑 Bearer + Verified |
-| `GET` | `/api/v1/tags` | Katalog bidang pekerjaan / tags | 🔑 Bearer + Verified |
-| `POST` | `/api/v1/requests` | Buat request pekerjaan | 🔑 Bearer + Verified |
-| `GET` | `/api/v1/requests` | Daftar request pekerjaan yang belum dihapus | 🔑 Bearer + Verified |
-| `GET` | `/api/v1/requests/:id` | Detail request pekerjaan | 🔑 Bearer + Verified |
-| `PATCH` | `/api/v1/requests/:id` | Update request milik sendiri | 🔑 Bearer + Verified |
-| `DELETE` | `/api/v1/requests/:id` | Hapus secara lunak request sendiri | 🔑 Bearer + Verified |
 
-**Status fitur:** Penugasan helper sudah memiliki tabel database, tetapi endpoint untuk mendaftar atau menugaskan helper belum tersedia. `budget_amount` adalah nominal penawaran dalam rupiah, belum merupakan transaksi pembayaran.
+### Profil, unggahan, meta
+
+| Method | Endpoint | Keterangan | Auth |
+|--------|----------|------------|------|
+| `GET` | `/api/v1/me` | Profil saya (lengkap dengan minat/skills/portfolio) | 🔑 |
+| `PATCH` | `/api/v1/me` | Ubah nama, kampus, jurusan, LinkedIn, website | 🔑 Verified |
+| `PUT` | `/api/v1/me/interests` | Simpan bidang minat | 🔑 Verified |
+| `PUT` | `/api/v1/me/skills` | Simpan skills | 🔑 Verified |
+| `POST` | `/api/v1/me/avatar` | Set foto profil dari file yang sudah diunggah | 🔑 Verified |
+| `POST` | `/api/v1/me/portfolio` | Tambah portfolio | 🔑 Verified |
+| `DELETE` | `/api/v1/me/portfolio/:id` | Hapus portfolio | 🔑 Verified |
+| `POST` | `/api/v1/me/student-verification` | Ajukan KTM | 🔑 Verified |
+| `GET` | `/api/v1/me/student-verification` | Status pengajuan KTM | 🔑 |
+| `GET` | `/api/v1/meta/subjects` | Daftar subject (publik, alias `/tags`) | ❌ |
+| `POST` | `/api/v1/uploads/presign` | Daftarkan file & dapatkan URL unggah | 🔑 Verified |
+| `PUT` | `/api/v1/uploads/:key` | Unggah data biner file | 🔑 Verified |
+| `DELETE` | `/api/v1/uploads/:key` | Hapus file yang belum dipakai | 🔑 Verified |
+| `GET` | `/api/v1/files/:key` | Ambil file (publik untuk avatar/portfolio) | ❌ / 🔑 |
+
+### Request, reply, helper
+
+| Method | Endpoint | Keterangan | Auth |
+|--------|----------|------------|------|
+| `GET` | `/api/v1/requests` | Explore: `q, subject, sort=newest\|deadline\|budget` | 🔑 Verified |
+| `POST` | `/api/v1/requests` | Buat request | 🔑 Verified |
+| `GET` | `/api/v1/requests/:id` | Detail request | 🔑 Verified |
+| `PATCH` | `/api/v1/requests/:id` | Edit request milik sendiri | 🔑 Verified |
+| `DELETE` | `/api/v1/requests/:id` | Soft delete request sendiri | 🔑 Verified |
+| `POST` | `/api/v1/requests/:id/cancel` | Batalkan request tanpa assignment aktif | 🔑 Verified |
+| `GET` | `/api/v1/me/requests` | Request saya (`status=floating\|on_progress\|completed\|cancelled`) | 🔑 Verified |
+| `GET` | `/api/v1/requests/:id/replies` | Daftar reply | 🔑 Verified |
+| `POST` | `/api/v1/requests/:id/replies` | Kirim reply (bukan pemilik) | 🔑 Verified |
+| `DELETE` | `/api/v1/replies/:id` | Tarik reply sendiri | 🔑 Verified |
+| `POST` | `/api/v1/helpers/:id/direct-requests` | Direct request + conversation | 🔑 Verified |
+| `GET` | `/api/v1/helpers` | Explore helper: `q, skill, sort=rating\|helps` | ❌ |
+| `GET` | `/api/v1/users/:id` | Profil publik helper | ❌ |
+| `GET` | `/api/v1/users/:id/reviews` | Review helper | ❌ |
+| `GET` | `/api/v1/me/home` | Ringkasan Home | 🔑 Verified |
+| `GET` | `/api/v1/me/pending-counts` | Badge jumlah antrean | 🔑 Verified |
+
+### Chat
+
+| Method | Endpoint | Keterangan | Auth |
+|--------|----------|------------|------|
+| `GET` | `/api/v1/conversations` | Daftar chat + pesan terakhir | 🔑 Verified |
+| `POST` | `/api/v1/conversations` | Ambil/buat chat `{request_id, helper_id}` | 🔑 Verified |
+| `GET` | `/api/v1/conversations/:id` | Detail chat + status assignment | 🔑 Verified |
+| `GET` | `/api/v1/conversations/:id/messages?before=` | Riwayat pesan (cursor) | 🔑 Verified |
+| `POST` | `/api/v1/conversations/:id/messages` | Kirim teks / lampiran | 🔑 Verified |
+| `POST` | `/api/v1/conversations/:id/read` | Tandai sudah dibaca | 🔑 Verified |
+| `POST` | `/api/v1/conversations/:id/decline` | Requester menolak helper | 🔑 Verified |
+
+### Assignment & agreement
+
+| Method | Endpoint | Keterangan | Auth |
+|--------|----------|------------|------|
+| `POST` | `/api/v1/requests/:id/assignments` | Terima helper `{helper_id}` | 🔑 Verified |
+| `GET` | `/api/v1/assignments/:id` | Detail assignment | 🔑 Peserta/Admin |
+| `GET` | `/api/v1/assignments/:id/agreement` | Isi agreement | 🔑 Peserta |
+| `POST` | `/api/v1/assignments/:id/agreement/approve` | Setujui agreement | 🔑 Peserta |
+| `POST` | `/api/v1/assignments/:id/fund` | Kunci dana → `ON_PROGRESS` | 🔑 Requester |
+| `POST` | `/api/v1/assignments/:id/completion` | Ajukan selesai | 🔑 Peserta |
+| `POST` | `/api/v1/assignments/:id/completion/confirm` | Konfirmasi → lepas dana | 🔑 Pihak lain |
+| `POST` | `/api/v1/assignments/:id/completion/reject` | Tolak penyelesaian | 🔑 Pihak lain |
+| `POST` | `/api/v1/assignments/:id/cancellation` | Ajukan batal `{reason}` | 🔑 Peserta |
+| `POST` | `/api/v1/assignments/:id/cancellation/confirm` | Konfirmasi batal → refund | 🔑 Pihak lain |
+| `POST` | `/api/v1/assignments/:id/cancellation/reject` | Tolak pembatalan | 🔑 Pihak lain |
+| `POST` | `/api/v1/assignments/:id/review` | Rating helper (sekali) | 🔑 Requester |
+| `POST` | `/api/v1/assignments/:id/disputes` | Ajukan dispute | 🔑 Peserta |
+| `GET` | `/api/v1/me/assignments` | `role=requester\|helper&status=` | 🔑 Verified |
+
+### Wallet, notifikasi, keamanan
+
+| Method | Endpoint | Keterangan | Auth |
+|--------|----------|------------|------|
+| `GET` | `/api/v1/me/wallet` | Saldo & dana ditahan | 🔑 |
+| `GET` | `/api/v1/me/transactions` | Mutasi saldo | 🔑 |
+| `POST` | `/api/v1/me/topups` | **501** sampai provider dipilih | 🔑 Verified |
+| `POST` | `/api/v1/me/withdrawals` | **501** sampai provider dipilih | 🔑 Verified |
+| `GET`/`POST` | `/api/v1/me/bank-accounts` | Rekening tujuan (nomor disamarkan) | 🔑 |
+| `DELETE` | `/api/v1/me/bank-accounts/:id` | Hapus rekening | 🔑 Verified |
+| `GET` | `/api/v1/me/notifications` | Daftar notifikasi | 🔑 |
+| `POST` | `/api/v1/me/notifications/:id/read` | Tandai satu dibaca | 🔑 |
+| `POST` | `/api/v1/me/notifications/read-all` | Tandai semua dibaca | 🔑 |
+| `POST` | `/api/v1/me/devices` | Simpan token FCM/Expo | 🔑 Verified |
+| `POST` | `/api/v1/reports` | Lapor request/user | 🔑 Verified |
+| `POST`/`GET` | `/api/v1/blocks` | Blokir / daftar blokir | 🔑 Verified |
+| `DELETE` | `/api/v1/blocks/:userId` | Buka blokir | 🔑 Verified |
+| `POST` | `/api/v1/webhooks/payments/:provider` | **501** placeholder provider | ❌ |
+
+### Admin 🛡️
+
+| Method | Endpoint | Keterangan |
+|--------|----------|-----------|
+| `GET` | `/api/v1/admin/dashboard/summary` | Total user, verified, helper aktif, request berjalan, antrean |
+| `GET` | `/api/v1/admin/dashboard/summary/export` | Export ringkasan (CSV) |
+| `GET` | `/api/v1/admin/pending-counts` | Badge lonceng per antrean |
+| `GET` | `/api/v1/admin/verifications` | Antrean KTM (`status`, `q`) |
+| `GET` | `/api/v1/admin/verifications/export` | Export antrean (CSV) |
+| `GET` | `/api/v1/admin/verifications/:id` | Detail + signed URL KTM |
+| `POST` | `/api/v1/admin/verifications/:id/claim` | Tandai sedang ditinjau |
+| `POST` | `/api/v1/admin/verifications/:id/approve` | Terima `{note?}` |
+| `POST` | `/api/v1/admin/verifications/:id/reject` | Tolak `{note}` (wajib) |
+| `GET` | `/api/v1/admin/users` | Daftar pengguna (`status`, `q`, `role`) |
+| `GET` | `/api/v1/admin/users/export` | Export pengguna (CSV) |
+| `GET` | `/api/v1/admin/users/:id` | Profil lengkap + statistik + jumlah laporan |
+| `POST` | `/api/v1/admin/users/:id/suspend` | `{days\|null, reason}` |
+| `POST` | `/api/v1/admin/users/:id/reactivate` | `{reason}` |
+| `POST` | `/api/v1/admin/users/:id/warn` | `{note}` |
+| `GET` | `/api/v1/admin/reports` | Laporan (`targetType`, `status`) |
+| `GET` | `/api/v1/admin/reports/export` | Export laporan (CSV) |
+| `GET` | `/api/v1/admin/reports/:id` | Detail laporan + target |
+| `POST` | `/api/v1/admin/reports/:id/claim` | Tandai ditinjau |
+| `POST` | `/api/v1/admin/reports/:id/resolve` | `{action, reason}` |
+| `POST` | `/api/v1/admin/reports/:id/dismiss` | `{reason}` |
+| `GET` | `/api/v1/admin/requests` | Request termoderasi |
+| `POST` | `/api/v1/admin/requests/:id/moderate` | `{action: HIDE\|REMOVE\|KEEP, reason}` |
+| `POST` | `/api/v1/admin/requests/:id/restore` | Pulihkan request |
+| `GET` | `/api/v1/admin/disputes` | Antrean dispute (`status`) |
+| `GET` | `/api/v1/admin/disputes/export` | Export dispute (CSV) |
+| `GET` | `/api/v1/admin/disputes/:id` | Detail + bukti + cuplikan chat |
+| `POST` | `/api/v1/admin/disputes/:id/claim` | Tandai ditinjau |
+| `POST` | `/api/v1/admin/disputes/:id/request-evidence` | `{note}` |
+| `POST` | `/api/v1/admin/disputes/:id/resolve` | `{decision, refund_amount, basis}` |
+| `GET` | `/api/v1/admin/transactions` | Aktivitas transaksi platform |
+| `GET` | `/api/v1/admin/transactions/export` | Export semua transaksi (CSV) |
+| `GET` | `/api/v1/admin/transactions/summary` | Ringkasan hari ini |
+| `GET` | `/api/v1/admin/transactions/:id` | Detail + riwayat pemrosesan |
+| `POST` | `/api/v1/admin/transactions/:id/request-fix` | `{note}` |
+| `POST` | `/api/v1/admin/transactions/:id/retry` | **501** sampai provider dipilih |
+| `GET` | `/api/v1/admin/transactions/:id/export` | Export detail (CSV) |
+| `GET` | `/api/v1/admin/audit-logs` | Jejak audit (`entityType`, `entityId`, `actorId`, `action`) |
+
+**Status fitur:** Seluruh alur non-payment sudah aktif: chat (REST), assignment/agreement, escrow saldo internal, review, dispute, dan moderasi admin. Integrasi payment gateway (top up, withdraw, webhook, retry payout) sengaja mengembalikan `501` dengan `code: "PAYMENT_PROVIDER_NOT_CONFIGURED"` sampai provider seperti Midtrans ditentukan. WebSocket realtime belum aktif; chat memakai REST dan notifikasi tersimpan di DB untuk dikirim lewat FCM/WS nanti.
 
 ---
 
 ## 🔐 Auth Endpoints
+
 
 ---
 
@@ -258,30 +391,86 @@ Mengautentikasi pengguna yang sudah terverifikasi dan mengembalikan **JWT Bearer
       "linkedin_url": "https://linkedin.com/in/johndoe",
       "website": "https://johndoe.dev",
       "email_verified_at": "2026-10-16T04:05:00.000Z",
-      "created_at": "2026-10-16T04:00:00.000Z",
-      "updated_at": "2026-10-16T04:05:00.000Z"
+      "role": "USER",
+      "status": "ACTIVE",
+      "last_login_at": "2026-10-16T04:05:00.000Z"
     },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiZW1haWwiOiJqb2huQGV4YW1wbGUuY29tIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjE2MDAwODY0MDB9.SIGNATURE"
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...SIGNATURE",
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...SIGNATURE",
+    "refresh_token": "3Vf8h...opaque",
+    "token_type": "Bearer",
+    "expires_in": 3600,
+    "role": "USER"
   }
 }
 ```
 
-> **Informasi JWT Token:**
-> - **Algoritma:** HS256
-> - **Masa berlaku:** `1 hari` (`expiresIn: "1d"`)
-> - **Payload:** `{ id: number, email: string, iat: number, exp: number }`
-> - **Cara pakai:** Sertakan di header request sebagai `Authorization: Bearer <token>`
+> **Informasi token:**
+> - `token` dipertahankan sebagai alias `access_token` agar build mobile lama tetap jalan.
+> - **Access token:** JWT HS256, default 1 jam (`ACCESS_TOKEN_TTL`), payload `{ id, email, role, iat, exp }`.
+> - **Refresh token:** string opaque 32 byte; server hanya menyimpan hash SHA-256-nya. Rotasi dilakukan setiap `/auth/refresh`; pemakaian ulang token lama mencabut seluruh sesi dalam family tersebut.
+> - **Cara pakai:** `Authorization: Bearer <access_token>`.
+> - Role & status akun **selalu** dibaca ulang dari database pada setiap request, jadi perubahan role/suspend langsung berlaku walau token belum kedaluwarsa.
 
 #### Response Error
 
 | Status | `message` | Penyebab |
 |--------|-----------|----------|
-| `400 Bad Request` | `"Email valid dan password wajib diisi"` | Field kosong atau format email salah |
+| `400 Bad Request` | `"Validasi gagal"` | Format input salah (lihat `errors[]`) |
 | `401 Unauthorized` | `"Email atau password salah"` | Kombinasi email/password tidak cocok |
-| `403 Forbidden` | `"Email belum terverifikasi. Silakan verifikasi OTP terlebih dahulu."` | Akun belum melewati `/verify-otp` |
+| `403 Forbidden` | `"Email belum terverifikasi. Silakan verifikasi email terlebih dahulu."` | Akun belum melewati `/verify-email` |
+| `403 Forbidden` | `"Akun Anda sedang ditangguhkan."` | `status=SUSPENDED`; body menyertakan `suspended_until` dan `suspended_reason` |
+| `429 Too Many Requests` | `"Terlalu banyak percobaan login. Coba lagi nanti."` | Melebihi 10 percobaan / 15 menit per email+IP |
 | `500 Internal Server Error` | `"Terjadi kesalahan pada server"` | Error tidak terduga |
 
 > ⚠️ **Keamanan:** Field `password` **tidak pernah** dikembalikan dalam response manapun. Login menggunakan bcrypt compare, bukan perbandingan plain text.
+
+---
+
+### 5. Refresh Token
+
+**`POST /api/v1/auth/refresh`**
+
+Menukar refresh token dengan pasangan token baru (rotasi). Refresh token lama langsung dicabut.
+
+```json
+{ "refresh_token": "3Vf8h...opaque" }
+```
+
+Response `200 OK` berisi `token`, `access_token`, `refresh_token` baru, `token_type`, `expires_in`, dan `role`.
+
+| Status | Penyebab |
+|--------|----------|
+| `401` | Token tidak valid, sudah dicabut, kedaluwarsa, atau dipakai ulang (family dicabut) |
+| `403` | Akun ditangguhkan |
+
+---
+
+### 6. Logout
+
+**`POST /api/v1/auth/logout`** — perlu `Authorization: Bearer`.
+
+Body opsional `{ "refresh_token": "..." }`. Tanpa body, **semua** refresh token milik user dicabut (logout semua perangkat).
+
+---
+
+### 7. Forgot & Reset Password
+
+**`POST /api/v1/auth/forgot-password`**
+
+```json
+{ "email": "john@example.com" }
+```
+
+Selalu membalas `200` dengan pesan generik agar keberadaan akun tidak bocor. OTP 6 digit dikirim bila email terdaftar dan terverifikasi; berlaku 10 menit, maksimal 5 percobaan, cooldown 60 detik (`429` + `retry_after_seconds`).
+
+**`POST /api/v1/auth/reset-password`**
+
+```json
+{ "email": "john@example.com", "otp": "123456", "new_password": "baru12345" }
+```
+
+Sukses `200`. Setelah reset, **semua refresh token dicabut** sehingga semua perangkat harus login ulang. OTP salah/kedaluwarsa `400`, batas percobaan `429`.
 
 ---
 
@@ -661,3 +850,193 @@ Jika ID tidak valid server mengembalikan `400`; request tidak ada atau telah dih
 
 #### Response Sukses — `204 No Content`
 (Tanpa body)
+
+---
+
+# 🧩 Modul Lanjutan
+
+Bagian ini merangkum modul baru. Contoh body lengkap mengikuti skema validasi di `src/validators/`.
+
+## Respons & pagination
+
+Semua daftar memakai bentuk yang sama:
+
+```json
+{
+  "success": true,
+  "message": "...",
+  "data": [],
+  "meta": { "page": 1, "limit": 20, "total": 0, "total_pages": 1 }
+}
+```
+
+Validasi gagal:
+
+```json
+{
+  "success": false,
+  "message": "Validasi gagal",
+  "errors": [{ "path": "body.title", "message": "title minimal 5 karakter" }]
+}
+```
+
+Chat memakai cursor: `GET /conversations/:id/messages?before=<message_id>&limit=30` → `{ messages: [...], next_before: 123 }`.
+
+---
+
+## 👤 Profil (`/me`)
+
+- `GET /me` → profil privat + `interests`, `skills`, `portfolio`, `student_verification_pending`, `is_student_verified`, `avatar_url`.
+- `PATCH /me` → field `full_name`, `university`, `major`, `linkedin_url`, `website`. Field lain ditolak `400`. `linkedin_url`/`website` menerima URL HTTP(S), string kosong, atau `null`.
+- `PUT /me/interests` & `PUT /me/skills` → `{ "tag_ids": [1,2] }` (maks 10). Seluruh daftar lama diganti.
+- `POST /me/avatar` → `{ "file_key": "..." }` dari file `purpose=AVATAR` yang sudah diunggah.
+- `POST /me/portfolio` → `{ title, description?, url?, file_key?, sort_order? }` (minimal salah satu dari `url`/`file_key`).
+- `DELETE /me/portfolio/:id` → `204`, soft delete.
+- `POST /me/student-verification` → `{ file_key }` dengan `purpose=STUDENT_ID`. Hanya boleh satu pengajuan aktif (`409` bila sudah ada).
+
+Profil publik `GET /users/:id` tidak pernah memuat `email`; menyertakan `avatar_url`, portfolio, skills, `rating_average`, `review_count`, dan `completed_helps`.
+
+---
+
+## 📎 Unggahan file (adapter lokal)
+
+Alur dua langkah, siap diganti presigned S3/R2:
+
+1. `POST /uploads/presign`
+   ```json
+   { "purpose": "AVATAR", "mime": "image/png", "byte_size": 120000, "original_name": "foto.png" }
+   ```
+   → `201 { file_key, upload_url, method: "PUT", headers: { "Content-Type": ... }, expires_at, max_bytes }`
+2. `PUT /uploads/:key` dengan **body biner** dan header `Content-Type` sesuai MIME → `200`.
+
+Batas per purpose:
+
+| Purpose | MIME | Maks |
+|---|---|---|
+| `AVATAR` | jpeg, png, webp | 2 MB |
+| `PORTFOLIO` | jpeg, png, webp, pdf | 5 MB |
+| `STUDENT_ID` | jpeg, png, webp, pdf | 5 MB |
+| `REQUEST_ATTACHMENT` | jpeg, png, webp, pdf | 5 MB |
+| `CHAT_ATTACHMENT` | jpeg, png, webp, pdf, zip, doc, docx | 10 MB |
+| `DISPUTE_EVIDENCE` | jpeg, png, webp, pdf | 10 MB |
+
+`GET /files/:key` publik untuk `AVATAR`/`PORTFOLIO`. File privat hanya bisa dibaca pemilik, peserta percakapan/assignment terkait, atau lewat URL bertanda tangan (`?token=`, 10 menit) yang dipakai admin. File tersimpan di `UPLOAD_DIR` (default `uploads/`, tidak di-commit).
+
+---
+
+## 📋 Request, reply, home
+
+- `GET /requests` — hanya `status=OPEN`, tidak dihapus/ dimoderasi, dan **tidak punya assignment aktif**. Filter: `q`, `subject` (slug tag), `tag_id`, `estimated_time`, `sort=newest|deadline|budget`, `page`, `limit`.
+- `POST /requests` — body sama seperti sebelumnya + `attachment_file_keys?` (maks 5, harus `purpose=REQUEST_ATTACHMENT` milik sendiri).
+- `PATCH /requests/:id` — `budget_amount` terkunci (`409`) bila sudah ada assignment; `deadline_at`/`tag_ids` juga terkunci bila ada assignment. Request `CANCELLED`/`COMPLETED`/`REMOVED` tidak dapat diubah.
+- `POST /requests/:id/cancel` — `{ reason? }`; hanya `OPEN` tanpa assignment aktif. Sukses mengembalikan detail dengan `status: "CANCELLED"`.
+- `GET /me/requests?status=` — `floating` (OPEN tanpa assignment aktif), `on_progress`, `completed`, `cancelled`. Setiap item menyertakan `assignment` terakhir.
+- `GET/POST /requests/:id/replies` — reply hanya dari non-pemilik, satu kali per helper, request harus `OPEN`, dan pasangan tidak saling blokir. `DELETE /replies/:id` hanya penulis selama belum ada assignment.
+- `POST /helpers/:id/direct-requests` — `{ request_id }` untuk request yang sudah ada, atau `{ title, description, estimated_time, deadline_at, budget_amount, tag_ids }` untuk membuat request baru. `message?` menjadi pesan pembuka chat. Response `{ request_id, conversation_id }`.
+- `GET /me/home` → `{ ongoing_as_requester, ongoing_as_helper, unread_notifications, unread_messages, wallet }`.
+- `GET /me/pending-counts` → `{ pending_agreements, on_progress, active_conversations, unread_notifications, unread_messages }`.
+
+Status request: `OPEN`, `CANCELLED`, `COMPLETED`, `HIDDEN`, `REMOVED`.
+
+---
+
+## 💬 Chat (REST)
+
+WebSocket belum aktif. Semua endpoint memerlukan salah satu peserta percakapan.
+
+- `GET /conversations?q=` → `{ id, request, counterpart, status, last_message_preview, last_message_at, unread_count, assignment }`.
+- `POST /conversations` → `{ request_id, helper_id }`. Hanya pemilik request. Idempoten: `200` bila sudah ada, `201` bila baru dibuat.
+- `GET /conversations/:id` → detail + `requester`, `helper`, `assignment`.
+- `GET /conversations/:id/messages?before=&limit=` → `{ messages: [{ id, body, created_at, sender, file, is_mine }], next_before }`.
+- `POST /conversations/:id/messages` → `{ body? , file_key? }` (minimal satu). `file_key` harus `purpose=CHAT_ATTACHMENT`.
+- `POST /conversations/:id/read` → `{ last_read_message_id? }`; tanpa body memakai pesan terakhir.
+- `POST /conversations/:id/decline` → requester menolak helper; conversation menjadi `DECLINED` dan assignment `PENDING_AGREEMENT` (bila ada) otomatis `CANCELLED`, request kembali `OPEN`.
+
+Blokir antar pengguna menolak pembuatan reply, chat, dan direct request (`403`).
+
+---
+
+## 🤝 Assignment, agreement, completion, cancellation
+
+Status assignment: `PENDING_AGREEMENT` → `ON_PROGRESS` → `COMPLETED`, atau `CANCELLED`/`DISPUTED`.
+
+1. **Terima helper** — `POST /requests/:id/assignments`
+   ```json
+   { "helper_id": 2, "amount": 50000, "terms": "opsional", "deadline_at": "2026-12-01T10:00:00.000Z" }
+   ```
+   `amount`/`terms`/`deadline_at` opsional; default dari request. Menolak self-assign (`400`), helper nonaktif (`404`), dan assignment aktif lain (`409`). Percakapan otomatis dibuat.
+2. **Setujui agreement** — `POST /assignments/:id/agreement/approve` dipanggil **masing-masing pihak**. Setiap pihak hanya sekali (`409`).
+3. **Danai** — `POST /assignments/:id/fund` (requester). Wajib dua persetujuan (`409`) dan saldo cukup (`402`). Saldo berpindah `balance → held`, assignment menjadi `ON_PROGRESS`.
+4. **Selesai** — `POST /assignments/:id/completion` (salah satu pihak) → status `PENDING`. Pihak **lain** memanggil `/completion/confirm` → dana dilepas ke helper (dipotong `PLATFORM_FEE_PERCENT`, default 0), request & assignment `COMPLETED`. `/completion/reject` mengembalikan ke `ON_PROGRESS`.
+5. **Batal** — `POST /assignments/:id/cancellation`:
+   - sebelum pendanaan (`PENDING_AGREEMENT`) → langsung `CANCELLED` dan request kembali `OPEN`;
+   - setelah dana dikunci → menjadi permintaan `PENDING`. Pihak lain `/cancellation/confirm` → **refund** ke saldo requester; `/cancellation/reject` tetap `ON_PROGRESS`.
+6. **Review** — `POST /assignments/:id/review` `{ rating: 1..5, comment? }`, hanya requester, hanya setelah `COMPLETED`, sekali per assignment.
+7. **Dispute** — `POST /assignments/:id/disputes` `{ reason, evidence_keys? }` → assignment `DISPUTED`, menunggu admin.
+8. `GET /me/assignments?role=requester|helper&status=` menyertakan `can_review` untuk requester setelah selesai.
+
+Semua transisi menulis **AuditLog** dan **Notification** dalam transaksi database yang sama.
+
+---
+
+## 💰 Wallet (internal) & payment gateway (ditunda)
+
+- `GET /me/wallet` → `{ balance, held, available, currency: "IDR", updated_at }`. `balance` = dana tersedia; `held` = dana terkunci untuk assignment berjalan.
+- `GET /me/transactions` → mutasi dengan filter `type`, `status`, `date_from`, `date_to`. Tipe: `TOPUP`, `WITHDRAWAL`, `HOLD`, `RELEASE`, `REFUND`, `FEE`, `ADJUSTMENT`; setiap baris menyimpan `balance_after` dan `held_after`.
+- `POST /me/topups` dan `POST /me/withdrawals` → **`501`**
+  ```json
+  { "success": false, "code": "PAYMENT_PROVIDER_NOT_CONFIGURED", "message": "Integrasi payment gateway belum dikonfigurasi. Hubungi admin." }
+  ```
+  Body divalidasi lebih dulu (`amount` integer, minimal Rp10.000) sehingga kontraknya sudah siap untuk Midtrans.
+- `GET/POST /me/bank-accounts`, `DELETE /me/bank-accounts/:id` → hanya menyimpan nomor bertopeng (`account_number_masked`); `provider_token` dikosongkan sampai provider dipilih.
+- `POST /webhooks/payments/:provider` → `501` placeholder (idempotensi & verifikasi signature ditambahkan saat integrasi).
+- `POST /admin/transactions/:id/retry` → `501` untuk alasan yang sama.
+
+Penyesuaian saldo manual oleh admin memakai `ADJUSTMENT` lewat service wallet; endpoint admin untuk itu belum dibuka.
+
+---
+
+## 🔔 Notifikasi & keamanan
+
+- `GET /me/notifications?unread_only=true` → `data[]` + `meta.unread`.
+- `POST /me/notifications/:id/read`, `POST /me/notifications/read-all`.
+- `POST /me/devices` `{ token, platform: android|ios|web }` — token FCM/Expo disimpan untuk pengiriman push di iterasi berikutnya.
+- `POST /reports` `{ target_type: REQUEST|USER, target_id, reason }` — mencegah laporan terbuka duplikat (`409`).
+- `POST /blocks` `{ user_id }`, `GET /blocks`, `DELETE /blocks/:userId`.
+
+---
+
+## 🛡️ Admin
+
+Semua route `/admin` memakai `authenticateToken → loadCurrentUser → requireAdmin`. Role dibaca ulang dari database, bukan dari klaim token.
+
+- **Dashboard** — `/admin/dashboard/summary` (total user, verified, helper aktif, request berjalan, antrean, dana ditahan), `/summary/export` (CSV), `/pending-counts`.
+- **Verifikasi KTM** — list (`status`, `q`), detail dengan `document_url` bertanda tangan 10 menit, `claim`, `approve {note?}`, `reject {note}` (note wajib). Approve mengisi `user.student_verified_at` dan mengirim notifikasi.
+- **Pengguna** — list (`status`, `role`, `q`), detail (+statistik & jumlah laporan), `suspend {days|null, reason}` (mencabut semua refresh token), `reactivate {reason}`, `warn {note}`. Admin tidak dapat menangguhkan sesama admin.
+- **Laporan** — list (`targetType`, `status`), detail (+target), `claim`, `resolve {action, reason}`, `dismiss {reason}`.
+- **Moderasi request** — `moderate {action: HIDE|REMOVE|KEEP, reason}`, `restore`. Request `HIDDEN`/`REMOVED` hanya terlihat oleh pemilik dan admin; `404` untuk pengguna lain.
+- **Dispute** — list, detail (pernyataan, bukti dengan signed URL, 30 pesan chat terakhir), `claim`, `request-evidence {note}`, `resolve {decision, refund_amount, basis}`:
+  - `FULL_REFUND` → seluruh dana dikembalikan ke requester, assignment `CANCELLED`, request kembali `OPEN`.
+  - `PARTIAL_REFUND` → `refund_amount` (integer, 0 < nilai < nominal) dikembalikan, sisanya dilepas ke helper; assignment `COMPLETED`.
+  - `RELEASE` → seluruh dana dilepas ke helper; assignment `COMPLETED`.
+  Semua langkah wallet + status + audit + notifikasi berada dalam **satu transaksi database**.
+- **Transaksi** — list (`type`, `status`, `q`, `date`), `summary?date=`, detail + `history`, `request-fix {note}`, `retry` (`501`), export CSV.
+- **Audit log** — `GET /admin/audit-logs?entityType=&entityId=&actorId=&action=&page=&limit=`.
+
+---
+
+## 🔄 Alur end-to-end (ringkas)
+
+```
+register → verify-email → login (access + refresh)
+  → presign + PUT file → /me/avatar → /me/interests → /me/skills
+  → /me/student-verification → admin approve
+  → POST /requests → helper POST /requests/:id/replies
+  → POST /conversations → POST messages
+  → POST /requests/:id/assignments
+  → POST .../agreement/approve (requester) → (helper)
+  → POST .../fund (balance → held, ON_PROGRESS)
+  → POST .../completion (helper) → POST .../completion/confirm (requester)
+  → dana dilepas ke helper → POST .../review
+  → (opsional) POST .../disputes → admin resolve (refund/release)
+```

@@ -5,6 +5,8 @@ WORKDIR /app
 
 # Local development uses PostgreSQL on the host. Inside Docker, loopback
 # addresses must point to the host gateway; remote database URLs stay intact.
+# Compose sets DATABASE_URL to the `postgres` service, so this only affects
+# ad-hoc `docker run` usage against a host database.
 COPY --chmod=755 <<'EOF' /usr/local/bin/mobile-api-entrypoint
 #!/bin/sh
 set -eu
@@ -41,7 +43,8 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-# Run explicitly through the Compose tools profile when migrations are needed.
+# Migrations run as their own Compose service before the API starts.
+# drizzle-kit lives in devDependencies, so this stage reuses the build image.
 FROM build AS migrations
 
 COPY drizzle.config.js ./
@@ -55,13 +58,19 @@ FROM base AS production
 
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV UPLOAD_DIR=/app/uploads
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
 
+# Includes dist/db/seed.js, used by the Compose `seed` service and `npm run db:seed:prod`.
 COPY --from=build /app/dist ./dist
+
+# Local file storage adapter writes here; the node user must own it so the
+# named volume keeps the same ownership on first mount.
+RUN mkdir -p /app/uploads && chown -R node:node /app/uploads
 
 USER node
 

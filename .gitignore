@@ -3,6 +3,9 @@ user.json
 node_modules/
 .vscode/
 
+# Uploaded files (local storage adapter)
+uploads/
+
 # Logs & Debugging
 logs/
 *.log

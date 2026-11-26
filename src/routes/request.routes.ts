@@ -1,29 +1,36 @@
 import { Router } from 'express';
-import { authenticateToken, requireVerified } from '../middlewares/authMiddleware';
 import {
-    createRequest,
-    listRequests_,
-    getRequest,
-    updateRequest,
-    deleteRequest,
+    cancelRequest, createRequest, deleteRequest, getRequest, listRequests_, updateRequest,
 } from '../controllers/request.controller';
+import {
+    createReply, deleteReply, listReplies,
+} from '../controllers/reply.controller';
+import { createAssignment } from '../controllers/assignment.controller';
+import { authenticateToken, requireVerified } from '../middlewares/authMiddleware';
+import { validate } from '../middlewares/validate.middleware';
+import {
+    cancelRequestSchema, createRequestSchema, listRequestsQuerySchema,
+    updateRequestSchema,
+} from '../validators/request.validator';
+import { createReplySchema } from '../validators/reply.validator';
+import { createAssignmentSchema } from '../validators/assignment.validator';
+import { idParamSchema } from '../validators/common.validator';
 
 const router = Router();
 
-// GET /api/v1/requests — list all requests (JWT + verified)
-router.get('/', authenticateToken, requireVerified, listRequests_);
+router.use(authenticateToken, requireVerified);
 
-// POST /api/v1/requests — create request (JWT + verified)
-router.post('/', authenticateToken, requireVerified, createRequest);
+router.get('/', validate({ query: listRequestsQuerySchema }), listRequests_);
+router.post('/', validate({ body: createRequestSchema }), createRequest);
 
-// GET /api/v1/requests/:id — get request detail (JWT + verified)
-router.get('/:id', authenticateToken, requireVerified, getRequest);
+router.get('/:id', validate({ params: idParamSchema }), getRequest);
+router.patch('/:id', validate({ params: idParamSchema, body: updateRequestSchema }), updateRequest);
+router.delete('/:id', validate({ params: idParamSchema }), deleteRequest);
+router.post('/:id/cancel', validate({ params: idParamSchema, body: cancelRequestSchema }), cancelRequest);
 
-// PATCH /api/v1/requests/:id — update own request (JWT + verified)
-router.patch('/:id', authenticateToken, requireVerified, updateRequest);
+router.get('/:id/replies', validate({ params: idParamSchema }), listReplies);
+router.post('/:id/replies', validate({ params: idParamSchema, body: createReplySchema }), createReply);
 
-// DELETE /api/v1/requests/:id — soft-delete own request (JWT + verified)
-router.delete('/:id', authenticateToken, requireVerified, deleteRequest);
+router.post('/:id/assignments', validate({ params: idParamSchema, body: createAssignmentSchema }), createAssignment);
 
 export default router;
-

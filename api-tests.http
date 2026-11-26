@@ -1,20 +1,95 @@
 ### Environment Variables
-@baseUrl = http://localhost:5000/api/v1
+@baseUrl = http://localhost:3000/api/v1
 # Ganti dengan token yang didapat dari POST /auth/login
 @token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+@refreshToken = isi-refresh-token-dari-login
+@adminToken = isi-access-token-admin
 
 ###############################################################################
-# 1. USER PROFILE ENDPOINTS
+# 1. AUTH
 ###############################################################################
 
-### 1.1 Ambil Profil Sendiri (GET /users/me)
-# Catatan: Tidak wajib email_verified_at
-GET {{baseUrl}}/users/me
+### 1.1 Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "full_name": "Fronli Dev",
+  "email": "fronli@example.com",
+  "password": "rahasia123"
+}
+
+### 1.2 Verify Email (OTP 6 digit)
+POST {{baseUrl}}/auth/verify-email
+Content-Type: application/json
+
+{
+  "email": "fronli@example.com",
+  "otp": "123456"
+}
+
+### 1.3 Resend OTP
+POST {{baseUrl}}/auth/resend-otp
+Content-Type: application/json
+
+{
+  "email": "fronli@example.com"
+}
+
+### 1.4 Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "fronli@example.com",
+  "password": "rahasia123"
+}
+
+### 1.5 Refresh Token
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refreshToken}}"
+}
+
+### 1.6 Logout
+POST {{baseUrl}}/auth/logout
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "refresh_token": "{{refreshToken}}"
+}
+
+### 1.7 Forgot Password
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "fronli@example.com"
+}
+
+### 1.8 Reset Password
+POST {{baseUrl}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "fronli@example.com",
+  "otp": "123456",
+  "new_password": "passwordBaru123"
+}
+
+###############################################################################
+# 2. PROFIL & META
+###############################################################################
+
+### 2.1 Profil saya
+GET {{baseUrl}}/me
 Authorization: Bearer {{token}}
 
-### 1.2 Update Profil Sendiri (PATCH /users/me)
-# Catatan: Wajib JWT + email sudah terverifikasi
-PATCH {{baseUrl}}/users/me
+### 2.2 Update profil
+PATCH {{baseUrl}}/me
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
@@ -26,34 +101,87 @@ Content-Type: application/json
   "website": "https://fronli.dev"
 }
 
-### 1.3 Update Profil Sendiri - Sebagian Field / Set null
-PATCH {{baseUrl}}/users/me
+### 2.3 Daftar subject (publik)
+GET {{baseUrl}}/meta/subjects
+
+### 2.4 Cari subject
+GET {{baseUrl}}/meta/subjects?q=design
+
+### 2.5 Simpan minat
+PUT {{baseUrl}}/me/interests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "tag_ids": [1, 2] }
+
+### 2.6 Simpan skills
+PUT {{baseUrl}}/me/skills
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "tag_ids": [3, 4] }
+
+###############################################################################
+# 3. UPLOAD FILE
+###############################################################################
+
+### 3.1 Presign avatar
+POST {{baseUrl}}/uploads/presign
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "university": "Institut Teknologi Bandung",
-  "website": null
+  "purpose": "AVATAR",
+  "mime": "image/png",
+  "byte_size": 20480,
+  "original_name": "avatar.png"
 }
 
-###############################################################################
-# 2. TAGS ENDPOINTS
-###############################################################################
+### 3.2 Upload biner (ganti :key dari response presign)
+PUT {{baseUrl}}/uploads/00000000-0000-0000-0000-000000000000.png
+Authorization: Bearer {{token}}
+Content-Type: image/png
 
-### 2.1 Ambil Semua Katalog Tag (GET /tags)
-GET {{baseUrl}}/tags
+< ./avatar.png
+
+### 3.3 Set avatar
+POST {{baseUrl}}/me/avatar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "file_key": "00000000-0000-0000-0000-000000000000.png" }
+
+### 3.4 Tambah portfolio
+POST {{baseUrl}}/me/portfolio
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Desain Poster Kampus",
+  "url": "https://example.com/poster",
+  "description": "Poster kegiatan teknologi kampus"
+}
+
+### 3.5 Hapus portfolio
+DELETE {{baseUrl}}/me/portfolio/1
 Authorization: Bearer {{token}}
 
-### 2.2 Cari Tag dengan Query `q` (GET /tags?q=design)
-GET {{baseUrl}}/tags?q=design
+### 3.6 Ajukan verifikasi KTM
+POST {{baseUrl}}/me/student-verification
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "file_key": "00000000-0000-0000-0000-000000000000.png" }
+
+### 3.7 Status verifikasi KTM
+GET {{baseUrl}}/me/student-verification
 Authorization: Bearer {{token}}
 
 ###############################################################################
-# 3. REQUEST PEKERJAAN (CRUD)
+# 4. REQUEST
 ###############################################################################
 
-### 3.1 Buat Request Pekerjaan Baru (POST /requests)
-# Tag ID: 1 = Design, 2 = UI/UX, 3 = Development, 4 = Technology, 5 = Startup, 6 = Digital Product
+### 4.1 Buat request
 POST {{baseUrl}}/requests
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -67,42 +195,461 @@ Content-Type: application/json
   "tag_ids": [1, 2]
 }
 
-### 3.2 List Semua Request Publik (GET /requests)
-# Default pagination: page=1, limit=20
+### 4.2 Explore request (default terbaru)
 GET {{baseUrl}}/requests
 Authorization: Bearer {{token}}
 
-### 3.3 List Request dengan Filter Lengkap
-GET {{baseUrl}}/requests?q=wireframe&tag_id=1&estimated_time=moderate&page=1&limit=10
+### 4.3 Explore request (filter + sort)
+GET {{baseUrl}}/requests?q=wireframe&subject=design&sort=budget&page=1&limit=10
 Authorization: Bearer {{token}}
 
-### 3.4 Ambil Detail Request berdasarkan ID (GET /requests/:id)
+### 4.4 Detail request
 GET {{baseUrl}}/requests/1
 Authorization: Bearer {{token}}
 
-### 3.5 List Request Milik Sendiri (GET /users/me/requests)
-GET {{baseUrl}}/users/me/requests
-Authorization: Bearer {{token}}
-
-### 3.6 List Request Milik Sendiri dengan Search/Filter
-GET {{baseUrl}}/users/me/requests?q=desain&page=1&limit=5
-Authorization: Bearer {{token}}
-
-### 3.7 Edit Request Sendiri (PATCH /requests/:id)
+### 4.5 Edit request
 PATCH {{baseUrl}}/requests/1
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "title": "Bantu Desain Wireframe & Prototyping Figma SOS",
-  "description": "Deskripsi diperbarui: mencakup pembuatan interactive prototype di Figma.",
-  "estimated_time": "extended",
-  "deadline_at": "2027-01-15T23:59:59.000Z",
-  "budget_amount": 250000,
-  "tag_ids": [1, 2, 6]
+  "description": "Deskripsi diperbarui: termasuk interactive prototype di Figma.",
+  "budget_amount": 250000
 }
 
-### 3.8 Hapus Request Sendiri - Soft Delete (DELETE /requests/:id)
-DELETE {{baseUrl}}/requests/1
+### 4.6 Batalkan request
+POST {{baseUrl}}/requests/1/cancel
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "reason": "Kebutuhan sudah terpenuhi" }
+
+### 4.7 Request saya (floating / on_progress / completed / cancelled)
+GET {{baseUrl}}/me/requests?status=floating
 Authorization: Bearer {{token}}
 
+###############################################################################
+# 5. REPLY & HELPER
+###############################################################################
+
+### 5.1 Kirim reply (helper)
+POST {{baseUrl}}/requests/1/replies
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "message": "Saya bisa bantu desain wireframe ini." }
+
+### 5.2 Daftar reply
+GET {{baseUrl}}/requests/1/replies
+Authorization: Bearer {{token}}
+
+### 5.3 Tarik reply
+DELETE {{baseUrl}}/replies/1
+Authorization: Bearer {{token}}
+
+### 5.4 Explore helper
+GET {{baseUrl}}/helpers?q=fronli&skill=design&sort=rating
+
+### 5.5 Profil publik
+GET {{baseUrl}}/users/2
+
+### 5.6 Review helper
+GET {{baseUrl}}/users/2/reviews
+
+### 5.7 Direct request ke helper
+POST {{baseUrl}}/helpers/2/direct-requests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "request_id": 1,
+  "message": "Halo, apakah bisa bantu project ini?"
+}
+
+### 5.8 Ringkasan home
+GET {{baseUrl}}/me/home
+Authorization: Bearer {{token}}
+
+### 5.9 Badge antrean
+GET {{baseUrl}}/me/pending-counts
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 6. CHAT
+###############################################################################
+
+### 6.1 Daftar chat
+GET {{baseUrl}}/conversations
+Authorization: Bearer {{token}}
+
+### 6.2 Buat / ambil chat
+POST {{baseUrl}}/conversations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "request_id": 1, "helper_id": 2 }
+
+### 6.3 Detail chat
+GET {{baseUrl}}/conversations/1
+Authorization: Bearer {{token}}
+
+### 6.4 Riwayat pesan
+GET {{baseUrl}}/conversations/1/messages?limit=30
+Authorization: Bearer {{token}}
+
+### 6.5 Kirim pesan
+POST {{baseUrl}}/conversations/1/messages
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "body": "Halo, kapan bisa mulai?" }
+
+### 6.6 Tandai dibaca
+POST {{baseUrl}}/conversations/1/read
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### 6.7 Tolak helper
+POST {{baseUrl}}/conversations/1/decline
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 7. ASSIGNMENT
+###############################################################################
+
+### 7.1 Terima helper
+POST {{baseUrl}}/requests/1/assignments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "helper_id": 2 }
+
+### 7.2 Detail assignment
+GET {{baseUrl}}/assignments/1
+Authorization: Bearer {{token}}
+
+### 7.3 Isi agreement
+GET {{baseUrl}}/assignments/1/agreement
+Authorization: Bearer {{token}}
+
+### 7.4 Setujui agreement (requester)
+POST {{baseUrl}}/assignments/1/agreement/approve
+Authorization: Bearer {{token}}
+
+### 7.5 Setujui agreement (helper, pakai token helper)
+POST {{baseUrl}}/assignments/1/agreement/approve
+Authorization: Bearer {{token}}
+
+### 7.6 Danai assignment
+POST {{baseUrl}}/assignments/1/fund
+Authorization: Bearer {{token}}
+
+### 7.7 Ajukan selesai
+POST {{baseUrl}}/assignments/1/completion
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "reason": "Pekerjaan sudah selesai" }
+
+### 7.8 Konfirmasi selesai (pihak lain)
+POST {{baseUrl}}/assignments/1/completion/confirm
+Authorization: Bearer {{token}}
+
+### 7.9 Tolak penyelesaian
+POST {{baseUrl}}/assignments/1/completion/reject
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "reason": "Hasil belum sesuai" }
+
+### 7.10 Ajukan pembatalan
+POST {{baseUrl}}/assignments/1/cancellation
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "reason": "Kesepakatan dibatalkan" }
+
+### 7.11 Konfirmasi pembatalan
+POST {{baseUrl}}/assignments/1/cancellation/confirm
+Authorization: Bearer {{token}}
+
+### 7.12 Tolak pembatalan
+POST {{baseUrl}}/assignments/1/cancellation/reject
+Authorization: Bearer {{token}}
+
+### 7.13 Review
+POST {{baseUrl}}/assignments/1/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "rating": 5, "comment": "Hasil rapi dan tepat waktu" }
+
+### 7.14 Ajukan dispute
+POST {{baseUrl}}/assignments/1/disputes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "reason": "Pekerjaan tidak sesuai kesepakatan awal." }
+
+### 7.15 Assignment saya
+GET {{baseUrl}}/me/assignments?role=requester&status=ON_PROGRESS
+Authorization: Bearer {{token}}
+
+###############################################################################
+# 8. WALLET, NOTIFIKASI, KEAMANAN
+###############################################################################
+
+### 8.1 Saldo
+GET {{baseUrl}}/me/wallet
+Authorization: Bearer {{token}}
+
+### 8.2 Mutasi saldo
+GET {{baseUrl}}/me/transactions?type=RELEASE&limit=20
+Authorization: Bearer {{token}}
+
+### 8.3 Top up (501 sampai provider dipilih)
+POST {{baseUrl}}/me/topups
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "amount": 100000, "method": "bank_transfer" }
+
+### 8.4 Withdraw (501 sampai provider dipilih)
+POST {{baseUrl}}/me/withdrawals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "amount": 50000, "bank_account_id": 1 }
+
+### 8.5 Rekening tujuan
+GET {{baseUrl}}/me/bank-accounts
+Authorization: Bearer {{token}}
+
+### 8.6 Tambah rekening
+POST {{baseUrl}}/me/bank-accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bank_code": "BCA",
+  "account_number": "1234567890",
+  "account_name": "Fronli Dev",
+  "is_primary": true
+}
+
+### 8.7 Hapus rekening
+DELETE {{baseUrl}}/me/bank-accounts/1
+Authorization: Bearer {{token}}
+
+### 8.8 Notifikasi
+GET {{baseUrl}}/me/notifications?unread_only=true
+Authorization: Bearer {{token}}
+
+### 8.9 Baca semua notifikasi
+POST {{baseUrl}}/me/notifications/read-all
+Authorization: Bearer {{token}}
+
+### 8.10 Simpan token perangkat
+POST {{baseUrl}}/me/devices
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "token": "fcm-token-contoh", "platform": "android" }
+
+### 8.11 Lapor request
+POST {{baseUrl}}/reports
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "target_type": "REQUEST", "target_id": 1, "reason": "Konten tidak sesuai ketentuan" }
+
+### 8.12 Blokir pengguna
+POST {{baseUrl}}/blocks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "user_id": 2 }
+
+### 8.13 Buka blokir
+DELETE {{baseUrl}}/blocks/2
+Authorization: Bearer {{token}}
+
+### 8.14 Webhook payment (501 placeholder)
+POST {{baseUrl}}/webhooks/payments/midtrans
+Content-Type: application/json
+
+{}
+
+###############################################################################
+# 9. ADMIN
+###############################################################################
+
+### 9.1 Login admin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@sos.ac.id", "password": "AdminPass123" }
+
+### 9.2 Ringkasan dashboard
+GET {{baseUrl}}/admin/dashboard/summary
+Authorization: Bearer {{adminToken}}
+
+### 9.3 Export ringkasan (CSV)
+GET {{baseUrl}}/admin/dashboard/summary/export
+Authorization: Bearer {{adminToken}}
+
+### 9.4 Badge antrean admin
+GET {{baseUrl}}/admin/pending-counts
+Authorization: Bearer {{adminToken}}
+
+### 9.5 Antrean verifikasi KTM
+GET {{baseUrl}}/admin/verifications?status=PENDING&q=fronli
+Authorization: Bearer {{adminToken}}
+
+### 9.6 Detail verifikasi (signed URL)
+GET {{baseUrl}}/admin/verifications/1
+Authorization: Bearer {{adminToken}}
+
+### 9.7 Klaim verifikasi
+POST {{baseUrl}}/admin/verifications/1/claim
+Authorization: Bearer {{adminToken}}
+
+### 9.8 Setujui verifikasi
+POST {{baseUrl}}/admin/verifications/1/approve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "note": "KTM valid" }
+
+### 9.9 Tolak verifikasi
+POST {{baseUrl}}/admin/verifications/1/reject
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "note": "Foto KTM tidak terbaca" }
+
+### 9.10 Daftar pengguna
+GET {{baseUrl}}/admin/users?q=fronli&status=ACTIVE
+Authorization: Bearer {{adminToken}}
+
+### 9.11 Detail pengguna
+GET {{baseUrl}}/admin/users/2
+Authorization: Bearer {{adminToken}}
+
+### 9.12 Tangguhkan akun
+POST {{baseUrl}}/admin/users/2/suspend
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "days": 7, "reason": "Pelanggaran aturan komunitas" }
+
+### 9.13 Aktifkan kembali
+POST {{baseUrl}}/admin/users/2/reactivate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "reason": "Banding diterima" }
+
+### 9.14 Peringatan
+POST {{baseUrl}}/admin/users/2/warn
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "note": "Hindari spam reply" }
+
+### 9.15 Daftar laporan
+GET {{baseUrl}}/admin/reports?targetType=REQUEST&status=OPEN
+Authorization: Bearer {{adminToken}}
+
+### 9.16 Detail laporan
+GET {{baseUrl}}/admin/reports/1
+Authorization: Bearer {{adminToken}}
+
+### 9.17 Klaim laporan
+POST {{baseUrl}}/admin/reports/1/claim
+Authorization: Bearer {{adminToken}}
+
+### 9.18 Selesaikan laporan
+POST {{baseUrl}}/admin/reports/1/resolve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "action": "WARN", "reason": "Pelanggaran ringan, pengguna diperingatkan" }
+
+### 9.19 Tutup tanpa tindakan
+POST {{baseUrl}}/admin/reports/1/dismiss
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "reason": "Tidak ditemukan pelanggaran" }
+
+### 9.20 Moderasi request
+POST {{baseUrl}}/admin/requests/1/moderate
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "action": "HIDE", "reason": "Konten duplikat" }
+
+### 9.21 Pulihkan request
+POST {{baseUrl}}/admin/requests/1/restore
+Authorization: Bearer {{adminToken}}
+
+### 9.22 Antrean dispute
+GET {{baseUrl}}/admin/disputes?status=OPEN
+Authorization: Bearer {{adminToken}}
+
+### 9.23 Detail dispute
+GET {{baseUrl}}/admin/disputes/1
+Authorization: Bearer {{adminToken}}
+
+### 9.24 Klaim dispute
+POST {{baseUrl}}/admin/disputes/1/claim
+Authorization: Bearer {{adminToken}}
+
+### 9.25 Minta bukti tambahan
+POST {{baseUrl}}/admin/disputes/1/request-evidence
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "note": "Mohon lampirkan screenshot percakapan" }
+
+### 9.26 Putuskan dispute
+POST {{baseUrl}}/admin/disputes/1/resolve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "decision": "PARTIAL_REFUND",
+  "refund_amount": 50000,
+  "basis": "Pekerjaan selesai sebagian"
+}
+
+### 9.27 Aktivitas transaksi
+GET {{baseUrl}}/admin/transactions?type=HOLD&status=SUCCESS&page=1&limit=20
+Authorization: Bearer {{adminToken}}
+
+### 9.28 Ringkasan transaksi
+GET {{baseUrl}}/admin/transactions/summary
+Authorization: Bearer {{adminToken}}
+
+### 9.29 Detail transaksi
+GET {{baseUrl}}/admin/transactions/1
+Authorization: Bearer {{adminToken}}
+
+### 9.30 Minta perbaikan rekening
+POST {{baseUrl}}/admin/transactions/1/request-fix
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "note": "Nomor rekening tidak valid, mohon diperbarui" }
+
+### 9.31 Proses ulang payout (501)
+POST {{baseUrl}}/admin/transactions/1/retry
+Authorization: Bearer {{adminToken}}
+
+### 9.32 Jejak audit
+GET {{baseUrl}}/admin/audit-logs?entityType=assignment&entityId=1
+Authorization: Bearer {{adminToken}}
